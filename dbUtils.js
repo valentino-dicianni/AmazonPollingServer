@@ -3,12 +3,18 @@
 var mongoose = require('mongoose'),
     Product = mongoose.model('Product');
 
-exports.get_all_products = () => {
-    Product.find({}, (err, products) => {
-        if (err)
-            console.log(err)
-        else console.log(products)
-    });
+
+exports.connect_DB = async function() {
+    mongoose.Promise = global.Promise;
+    return await mongoose.connect('mongodb://localhost:27017/test', { useUnifiedTopology: true, useNewUrlParser: true })
+};
+
+exports.get_all_products = async function() {
+   return await Product.find({}).exec();
+};
+
+exports.update_product = async function(product) {
+    return await Product.updateOne({ "ASIN": product.ASIN }, product).exec();
 };
 
 exports.add_test_product = () => {
