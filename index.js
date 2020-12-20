@@ -25,9 +25,7 @@ const Product = require('./models/productModel'); //created model loading here
 const db = require('./dbUtils');
 mongoose.Promise = global.Promise;
 mongoose.connect('mongodb://localhost:27017/test', { useUnifiedTopology: true, useNewUrlParser: true })
-  .then(
-    () => {
-      
+  .then(() => {
       console.log('Connected to DB');
       db.get_all_products().then((products) => {
         //console.log("All products retrieved.>", JSON.stringify(products));
@@ -38,9 +36,7 @@ mongoose.connect('mongodb://localhost:27017/test', { useUnifiedTopology: true, u
             console.log(res, " Updated.");
           });
         }
-
       });
-
     },
     err => { console.log('ERROR connecting to db: ' + err) }
   );
