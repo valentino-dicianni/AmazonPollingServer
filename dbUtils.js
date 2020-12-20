@@ -3,12 +3,6 @@
 var mongoose = require('mongoose'),
     Product = mongoose.model('Product');
 
-
-exports.connect_DB = async function() {
-    mongoose.Promise = global.Promise;
-    return await mongoose.connect('mongodb://localhost:27017/test', { useUnifiedTopology: true, useNewUrlParser: true })
-};
-
 exports.get_all_products = async function() {
    return await Product.find({}).exec();
 };
