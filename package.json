@@ -1,0 +1,17 @@
+{
+  "name": "pollingserver",
+  "version": "1.0.0",
+  "description": "Polling server for Amazon",
+  "main": "index.js",
+  "scripts": {
+    "test": "run"
+  },
+  "author": "Valentino Di Cianni",
+  "license": "ISC",
+  "dependencies": {
+    "amazon-pa-api50": "^0.2.0",
+    "dotenv": "^8.2.0",
+    "log-timestamp": "^0.3.0",
+    "mongoose": "^5.11.8"
+  }
+}
