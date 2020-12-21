@@ -3,7 +3,8 @@ const Api = require('amazon-pa-api50')
 const Config = require('amazon-pa-api50/lib/config');
 require('dotenv').config();
 require('log-timestamp');
-mongoose = require('mongoose');
+var mongoose = require('mongoose');
+var admin = require("firebase-admin");
 
 const resources = require('amazon-pa-api50/lib/options').Resources
 const condition = require('amazon-pa-api50/lib/options').Condition
@@ -41,12 +42,15 @@ mongoose.connect('mongodb://localhost:27017/test', { useUnifiedTopology: true, u
       });
     }, 15000); // Ciclo eseguito ogni n secondi
     // ########> FINE setInterval <########
-
   },
     err => { console.log('ERROR connecting to db: ' + err) }
   );
 
 
+/**
+ * @param {product} p 
+ * Check if product is on offer and update mongoDB
+ */
 async function updateDB(p) {//TODO: mi sa che bisogna chiederli a gruppi di N prodotti 
   let res = await getProductFromAmazon(p);
   productInfo = res.data.ItemsResult.Items[0];
@@ -74,6 +78,51 @@ async function updateDB(p) {//TODO: mi sa che bisogna chiederli a gruppi di N pr
     });
   }
 }
+
+
+/**
+ * Send messages via Firebase to registerd users
+ * with new offers 
+ */
+async function sendNotifications() {
+  const registrationTokens = [
+    'YOUR_REGISTRATION_TOKEN_1',
+    // …
+    'YOUR_REGISTRATION_TOKEN_N',
+  ];
+
+  const message = {
+    data: { score: '850', time: '2:45' },
+    tokens: registrationTokens,
+  }
+
+  admin.messaging().sendMulticast(message)
+    .then((response) => {
+      console.log(response.successCount + ' messages were sent successfully');
+    });
+}
+
+
+/**
+ * @param {*} product 
+ * Get Info about the product from Amazon server
+ */
+const getProductFromAmazon = async function (product) {
+  console.log(`Checking product ${product.ASIN} on Amazon...`)
+  let resourceList = resources.getItemInfo
+  resourceList = resourceList
+    .concat(resources.getItemInfo)
+    .concat(resources.getOffers)
+
+  return await api.getItemById([product.ASIN], {
+    parameters: resourceList,
+    condition: condition.New
+  });
+}
+
+//testGetItemById();
+//testGetVariations()
+//testSearch();
 
 const testGetVariations = () => {
   console.log(' ===== getVariations =====')
@@ -104,20 +153,3 @@ const testSearch = () => {
     console.log('Error: ', error)
   })
 }
-
-const getProductFromAmazon = async function (product) {
-  console.log(`Checking product ${product.ASIN} on Amazon...`)
-  let resourceList = resources.getItemInfo
-  resourceList = resourceList
-    .concat(resources.getItemInfo)
-    .concat(resources.getOffers)
-
-  return await api.getItemById([product.ASIN], {
-    parameters: resourceList,
-    condition: condition.New
-  });
-}
-
-//testGetItemById();
-//testGetVariations()
-//testSearch();
