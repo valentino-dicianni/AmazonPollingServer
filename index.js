@@ -6,6 +6,12 @@ require('log-timestamp');
 var mongoose = require('mongoose');
 var admin = require("firebase-admin");
 
+var serviceAccount = require("./track4deals-firebase-adminsdk-h07o4-64eee604e3.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
 const resources = require('amazon-pa-api50/lib/options').Resources
 const condition = require('amazon-pa-api50/lib/options').Condition
 const searchIndex = require('amazon-pa-api50/lib/options').SearchIndex
