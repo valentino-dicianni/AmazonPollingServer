@@ -40,7 +40,7 @@ exports.update_product = async function (product) {
 
     if (result.ok != 1)
         console.log(`ERROR: Product ${p.ASIN} error updating database Tracking...`)
-    if (result.ok == 1) {return (await get_allFirebaseToken(product)).map(x => x.firebaseToken) }
+    if (result.ok == 1 && product.isDeal) {return (await get_allFirebaseToken(product)).map(x => x.firebaseToken) }
     else return [];
 };
 

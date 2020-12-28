@@ -38,7 +38,7 @@ mongoose.connect('mongodb://localhost:27017/test', { useUnifiedTopology: true, u
     //db.add_test_product();
     //db.add_test_tracking();
     // ########> INIZIO setInterval <########
-    
+
     setInterval(() => {
       console.log("Executing Polling to Amazon...")
       db.get_all_products().then((products) => {
@@ -50,7 +50,7 @@ mongoose.connect('mongodb://localhost:27017/test', { useUnifiedTopology: true, u
         }
       });
     }, 5000); // Ciclo eseguito ogni n secondi
-    
+
     // ########> FINE setInterval <########
   },
     err => { console.log('ERROR connecting to db: ' + err) }
@@ -83,11 +83,13 @@ async function updateDB(p) {//TODO: mi sa che bisogna chiederli a gruppi di N pr
     }
   }
   else { // Se il prodotto non è in offerta
-    p.normal_price = productInfo.Offers.Listings[0].Price.Amount;
-    p.isDeal = false;
-    db.update_product(p).then((res) => {
-      console.log(`Product ${p.ASIN} not on offer, DB UPDATED...`)
-    });
+    if (p.isDeal) {
+      p.normal_price = productInfo.Offers.Listings[0].Price.Amount;
+      p.isDeal = false;
+      db.update_product(p).then((res) => {
+        console.log(`Product ${p.ASIN} not on offer, DB UPDATED...`)
+      });
+    }
   }
 }
 
@@ -100,7 +102,7 @@ async function sendNotifications(firebaseTokenList) {
   const registrationTokens = firebaseTokenList;
 
   const message = {
-    data: {message : "Nuove offerte sui tuoi prodotti tracciati" },
+    data: { message: "Nuove offerte sui tuoi prodotti tracciati" },
     tokens: registrationTokens,
   }
 
