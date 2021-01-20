@@ -62,7 +62,7 @@ mongoose.connect('mongodb://localhost:27017/test', { useUnifiedTopology: true, u
  * Check if product is on offer and update mongoDB
  */
 async function updateDB(p) {//TODO: mi sa che bisogna chiederli a gruppi di N prodotti 
-  let res = await getProductFromAmazon(p);
+  let res = await getProductFromAmazon(p).catch(e => {console.log(e);});
   productInfo = res.data.ItemsResult.Items[0];
   let result;
   //console.log(productInfo.Offers.Listings[0].Price);
