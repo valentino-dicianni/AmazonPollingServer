@@ -5,17 +5,29 @@ require('dotenv').config();
 require('log-timestamp');
 var mongoose = require('mongoose');
 var admin = require("firebase-admin");
-
 var serviceAccount = require("./track4deals-firebase-adminsdk-h07o4-64eee604e3.json");
+var InfiniteLoop = require('infinite-loop');
+const delay = require('delay');
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
 const resources = require('amazon-pa-api50/lib/options').Resources
+const Localresources = {
+  getOffers: [
+    "Offers.Listings.Price",
+    "Images.Primary.Medium",
+    "Images.Primary.Large",
+    'Offers.Summaries.HighestPrice'
+  ]
+}
 const condition = require('amazon-pa-api50/lib/options').Condition
 const searchIndex = require('amazon-pa-api50/lib/options').SearchIndex
 const country = require('amazon-pa-api50/lib/options').Country
+
+var i, j, temparray, chunk = 10;
+
 
 // Config Amazon API
 let myConfig = new Config(country.Italy);
@@ -35,20 +47,10 @@ mongoose.Promise = global.Promise;
 mongoose.connect('mongodb://localhost:27017/test', { useUnifiedTopology: true, useNewUrlParser: true })
   .then(() => {
     console.log('Connected to DB');
-    //db.add_test_product();
-    //db.add_test_tracking();
-    // ########> INIZIO setInterval <########
 
+    // ########> INIZIO setInterval <########
     setInterval(() => {
-      console.log("Executing Polling to Amazon...")
-      db.get_all_products().then((products) => {
-        if (products.length > 0) {
-          console.log(`DB: ${products.length} products retrieved...`);
-          for (p of products) {
-            updateDB(p);
-          }
-        }
-      });
+      fetchProducts()
     }, 5000); // Ciclo eseguito ogni n secondi
 
     // ########> FINE setInterval <########
@@ -57,41 +59,84 @@ mongoose.connect('mongodb://localhost:27017/test', { useUnifiedTopology: true, u
   );
 
 
+const fetchProducts = async function () {
+  console.log("Executing Polling to Amazon...")
+  let products = await db.get_all_products()
+  if (products.length > 0) {
+    console.log(`DB: ${products.length} products retrieved...`);
+    var i, j, temparray, chunk = 10;
+    for (i = 0, j = products.length; i < j; i += chunk) {
+      temparray = products.slice(i, i + chunk);
+      await updateDB(temparray);
+    }
+  }
+}
+
+
 /**
  * @param {product} p 
  * Check if product is on offer and update mongoDB
  */
 async function updateDB(p) {//TODO: mi sa che bisogna chiederli a gruppi di N prodotti 
-  let res = await getProductFromAmazon(p).catch(e => {console.log(e);});
-  productInfo = res.data.ItemsResult.Items[0];
-  let result;
-  //console.log(productInfo.Offers.Listings[0].Price);
-  //TODO: qui bisogna controllare se prima non era in offerta e mandare la notifica in caso positivo
-  if (productInfo.Offers.Listings[0].Price.Savings != undefined) { // Se il prodotto è in offerta
-    if (p.offer_price != productInfo.Offers.Listings[0].Price.Amount.toFixed(2)) { // Se l'offerta è cambiata
-      p.normal_price = productInfo.Offers.Listings[0].Price.Amount.toFixed(2) + productInfo.Offers.Listings[0].Price.Savings.Amount.toFixed(2);
-      p.offer_price = productInfo.Offers.Listings[0].Price.Amount.toFixed(2);
-      p.discount_perc = productInfo.Offers.Listings[0].Price.Savings.Percentage;
-      p.isDeal = true;
-      db.update_product(p).then((firebaseTokenList) => {
-        console.log(`Product ${p.ASIN} on offer, updated price from ${p.normal_price} to ${p.offer_price}...`)
-        // Invio notifiche dei prodotti modificati
-        sendNotifications(firebaseTokenList)
-      });
-    } else {
-      console.log(`Product ${p.ASIN} still on offer...`)
-    }
-  }
-  else { // Se il prodotto non è in offerta
-    if (p.isDeal) {
-      p.normal_price = productInfo.Offers.Listings[0].Price.Amount;
-      p.isDeal = false;
-      db.update_product(p).then((res) => {
-        console.log(`Product ${p.ASIN} not on offer, DB UPDATED...`)
-      });
+  let res = await getProductFromAmazon(p).catch(e => { console.log(e); });
+  let items = res.data.ItemsResult.Items;
+
+  for (i in items) {
+    let productInfo = items[i];
+    if (productInfo.Offers != undefined) { // Prodotto non ha il prezzo o ci sono casini
+      if (productInfo.Offers.Listings[0].Price.Savings != undefined) { // Se il prodotto è in offerta
+        if (p[i].offer_price != productInfo.Offers.Listings[0].Price.Amount.toFixed(2)) { // Se l'offerta è cambiata
+          p[i].normal_price = productInfo.Offers.Listings[0].Price.Amount.toFixed(2) + productInfo.Offers.Listings[0].Price.Savings.Amount.toFixed(2);
+          p[i].offer_price = productInfo.Offers.Listings[0].Price.Amount.toFixed(2);
+          p[i].discount_perc = productInfo.Offers.Listings[0].Price.Savings.Percentage;
+          p[i].isDeal = true;
+          db.update_product(p[i]).then((firebaseTokenList) => {
+            console.log(`Product ${p[i].ASIN} on offer, updated price from ${p[i].normal_price} to ${p[i].offer_price}...`)
+            // Invio notifiche dei prodotti modificati
+            sendNotifications(firebaseTokenList)
+          });
+        } else {
+          console.log(`Product ${p[i].ASIN} still on offer...`)
+        }
+      }
+      else { // Se il prodotto non è in offerta
+        if (p[i].isDeal) {
+          p[i].normal_price = productInfo.Offers.Listings[0].Price.Amount;
+          p[i].isDeal = false;
+          db.update_product(p[i]).then((res) => {
+            console.log(`Product ${p[i].ASIN} not on offer, DB UPDATED...`)
+          });
+        }
+      }
     }
   }
 }
+
+
+
+
+/**
+ * @param {*} product 
+ * Get Info about the product from Amazon server
+ */
+const getProductFromAmazon = async function (products) {
+  let resourceList = resources.getItemInfo
+  resourceList = resourceList
+    .concat(resources.getItemInfo)
+    .concat(Localresources.getOffers)
+
+  let pList = []
+  for (p of products) {
+    console.log(`Checking product ${p.ASIN} on Amazon...`)
+    pList.push(p.ASIN)
+  }
+
+  return await api.getItemById(pList, {
+    parameters: resourceList,
+    condition: condition.New
+  });
+}
+
 
 
 /**
@@ -112,54 +157,3 @@ async function sendNotifications(firebaseTokenList) {
     });
 }
 
-
-/**
- * @param {*} product 
- * Get Info about the product from Amazon server
- */
-const getProductFromAmazon = async function (product) {
-  console.log(`Checking product ${product.ASIN} on Amazon...`)
-  let resourceList = resources.getItemInfo
-  resourceList = resourceList
-    .concat(resources.getItemInfo)
-    .concat(resources.getOffers)
-
-  return await api.getItemById([product.ASIN], {
-    parameters: resourceList,
-    condition: condition.New
-  });
-}
-
-//testGetItemById();
-//testGetVariations()
-//testSearch();
-
-const testGetVariations = () => {
-  console.log(' ===== getVariations =====')
-  const resourceList = resources.getOffers
-
-  api.getVariations("B07B4F8WC6", {
-    parameters: resourceList,
-    condition: condition.Any
-  }).then((response) => {
-    console.log("RES: %j", response.data)
-  }, (error) => {
-    console.log('Error: ', error)
-  })
-}
-
-const testSearch = () => {
-  console.log(' ===== search result =====')
-
-  let resourceList = resources.getItemInfo
-  resourceList = resourceList.concat(resources.getImagesPrimary)
-
-  api.search("tv lg", {
-    parameters: resourceList,
-    searchIndex: searchIndex.Electronics
-  }).then((response) => {
-    console.log("RES: %j", response.data)
-  }, (error) => {
-    console.log('Error: ', error)
-  })
-}
