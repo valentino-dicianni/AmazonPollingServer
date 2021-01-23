@@ -47,17 +47,19 @@ mongoose.Promise = global.Promise;
 mongoose.connect('mongodb://localhost:27017/test', { useUnifiedTopology: true, useNewUrlParser: true })
   .then(() => {
     console.log('Connected to DB');
-
-    // ########> INIZIO setInterval <########
-    setInterval(() => {
-      fetchProducts()
-    }, 5000); // Ciclo eseguito ogni n secondi
-
-    // ########> FINE setInterval <########
+    mainLoop()
   },
     err => { console.log('ERROR connecting to db: ' + err) }
   );
 
+
+const mainLoop = async function (){
+  while(true){
+    console.log(" => Starting new update loop <=")
+    await fetchProducts()
+    await sleep(5000)
+  }
+}
 
 const fetchProducts = async function () {
   console.log("Executing Polling to Amazon...")
@@ -68,6 +70,7 @@ const fetchProducts = async function () {
     for (i = 0, j = products.length; i < j; i += chunk) {
       temparray = products.slice(i, i + chunk);
       await updateDB(temparray);
+      await sleep(1000)
     }
   }
 }
@@ -112,9 +115,6 @@ async function updateDB(p) {//TODO: mi sa che bisogna chiederli a gruppi di N pr
   }
 }
 
-
-
-
 /**
  * @param {*} product 
  * Get Info about the product from Amazon server
@@ -138,7 +138,6 @@ const getProductFromAmazon = async function (products) {
 }
 
 
-
 /**
  * Send messages via Firebase to registerd users
  * with new offers 
@@ -155,5 +154,9 @@ async function sendNotifications(firebaseTokenList) {
     .then((response) => {
       console.log("FIREBASE: ", response.successCount + ' messages were sent successfully...');
     });
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
