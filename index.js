@@ -43,8 +43,9 @@ const api = new Api(myConfig)
 const Product = require('./models/productModel'); //created model loading here
 const Tracking = require('./models/trackingModel'); //created model loading here
 const db = require('./dbUtils');
+const { messaging } = require('firebase-admin');
 mongoose.Promise = global.Promise;
-mongoose.connect('mongodb://localhost:27017/test', { useUnifiedTopology: true, useNewUrlParser: true })
+mongoose.connect(process.env.MONGODB_CONNECTION_STRING, { useUnifiedTopology: true, useNewUrlParser: true })
   .then(() => {
     console.log('Connected to DB');
     mainLoop()
@@ -57,7 +58,7 @@ const mainLoop = async function (){
   while(true){
     console.log(" => Starting new update loop <=")
     await fetchProducts()
-    await sleep(5000)
+    await sleep(10000)
   }
 }
 
@@ -83,12 +84,11 @@ const fetchProducts = async function () {
 async function updateDB(p) {//TODO: mi sa che bisogna chiederli a gruppi di N prodotti 
   let res = await getProductFromAmazon(p).catch(e => { console.log(e); });
   let items = res.data.ItemsResult.Items;
-
   for (i in items) {
     let productInfo = items[i];
     if (productInfo.Offers != undefined) { // Prodotto non ha il prezzo o ci sono casini
       if (productInfo.Offers.Listings[0].Price.Savings != undefined) { // Se il prodotto è in offerta
-        if (p[i].offer_price != productInfo.Offers.Listings[0].Price.Amount.toFixed(2)) { // Se l'offerta è cambiata
+        if (p[i].offer_price.toFixed(2) != productInfo.Offers.Listings[0].Price.Amount.toFixed(2)) { // Se l'offerta è cambiata
           p[i].normal_price = productInfo.Offers.Listings[0].Price.Amount.toFixed(2) + productInfo.Offers.Listings[0].Price.Savings.Amount.toFixed(2);
           p[i].offer_price = productInfo.Offers.Listings[0].Price.Amount.toFixed(2);
           p[i].discount_perc = productInfo.Offers.Listings[0].Price.Savings.Percentage;
@@ -96,7 +96,9 @@ async function updateDB(p) {//TODO: mi sa che bisogna chiederli a gruppi di N pr
           db.update_product(p[i]).then((firebaseTokenList) => {
             console.log(`Product ${p[i].ASIN} on offer, updated price from ${p[i].normal_price} to ${p[i].offer_price}...`)
             // Invio notifiche dei prodotti modificati
-            sendNotifications(firebaseTokenList)
+            if (firebaseTokenList.length > 0) {
+              sendNotifications(firebaseTokenList, p[i])
+            }
           });
         } else {
           console.log(`Product ${p[i].ASIN} still on offer...`)
@@ -110,6 +112,9 @@ async function updateDB(p) {//TODO: mi sa che bisogna chiederli a gruppi di N pr
             console.log(`Product ${p[i].ASIN} not on offer, DB UPDATED...`)
           });
         }
+        else {
+          console.log(`Product ${p[i].ASIN} remains not on offer...`)
+        }
       }
     }
   }
@@ -122,7 +127,8 @@ async function updateDB(p) {//TODO: mi sa che bisogna chiederli a gruppi di N pr
 const getProductFromAmazon = async function (products) {
   let resourceList = resources.getItemInfo
   resourceList = resourceList
-    .concat(resources.getItemInfo)
+    //.concat(resources.getItemInfo)
+    .concat(resources.getBrowserNodeInfo)
     .concat(Localresources.getOffers)
 
   let pList = []
@@ -142,14 +148,18 @@ const getProductFromAmazon = async function (products) {
  * Send messages via Firebase to registerd users
  * with new offers 
  */
-async function sendNotifications(firebaseTokenList) {
+async function sendNotifications(firebaseTokenList, p) {
   const registrationTokens = firebaseTokenList;
 
   const message = {
-    data: { message: "Nuove offerte sui tuoi prodotti tracciati" },
+    notification: {
+      title: 'Nuove offerte sui tuoi prodotti!',
+      body: `${p.title} è di nuovo in offerta con il ${p.discount_perc}% di sconto!!`
+    },
     tokens: registrationTokens,
   }
-
+  //console.log("Sending Message to: ", firebaseTokenList)
+  
   admin.messaging().sendMulticast(message)
     .then((response) => {
       console.log("FIREBASE: ", response.successCount + ' messages were sent successfully...');
