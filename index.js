@@ -6,11 +6,21 @@ require('log-timestamp');
 var mongoose = require('mongoose');
 var admin = require("firebase-admin");
 var serviceAccount = require("./track4deals-firebase-adminsdk-h07o4-64eee604e3.json");
-var InfiniteLoop = require('infinite-loop');
 const delay = require('delay');
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.cert({
+    "type": process.env.FIREBASE_TYPE,
+    "project_id": process.env.FIREBASE_PROJECT_ID,
+    "private_key_id": process.env.FIREBASE_PRIVATE_KEY_ID,
+    "private_key": process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    "client_email": process.env.FIREBASE_CLIENT_EMAIL,
+    "client_id": process.env.FIREBASE_CLIENT_ID,
+    "auth_uri": process.env.FIREBASE_AUTH_URI,
+    "token_uri": process.env.FIREBASE_TOKEN_URI,
+    "auth_provider_x509_cert_url": process.env.FIREBASE_AUTH_PROVIDER_X509_CERT_URL,
+    "client_x509_cert_url": process.env.FIREBASE_CLIENT_X509_CERT_URL
+  }),
 });
 
 const resources = require('amazon-pa-api50/lib/options').Resources
@@ -26,9 +36,6 @@ const condition = require('amazon-pa-api50/lib/options').Condition
 const searchIndex = require('amazon-pa-api50/lib/options').SearchIndex
 const country = require('amazon-pa-api50/lib/options').Country
 
-var i, j, temparray, chunk = 10;
-
-
 // Config Amazon API
 let myConfig = new Config(country.Italy);
 myConfig.accessKey = process.env.ACCESS_KEY;
@@ -43,7 +50,6 @@ const api = new Api(myConfig)
 const Product = require('./models/productModel'); //created model loading here
 const Tracking = require('./models/trackingModel'); //created model loading here
 const db = require('./dbUtils');
-const { messaging } = require('firebase-admin');
 mongoose.Promise = global.Promise;
 mongoose.connect(process.env.MONGODB_CONNECTION_STRING, { useUnifiedTopology: true, useNewUrlParser: true })
   .then(() => {
@@ -58,7 +64,7 @@ const mainLoop = async function (){
   while(true){
     console.log(" => Starting new update loop <=")
     await fetchProducts()
-    await sleep(10000)
+    await sleep(100000)
   }
 }
 

@@ -4,7 +4,9 @@
   "description": "Polling server for Amazon",
   "main": "index.js",
   "scripts": {
-    "test": "run"
+    "test": "run",
+    "start": "node index.js"
+
   },
   "author": "Valentino Di Cianni",
   "license": "ISC",
