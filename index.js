@@ -22,6 +22,14 @@ admin.initializeApp({
   }),
 });
 
+
+var express = require('express'),
+  app = express(),
+  port = process.env.PORT || 3001,
+  bodyParser = require('body-parser');
+app.listen(port);
+console.log('track4Deals Polling server API server started on: ' + port);
+
 const resources = require('amazon-pa-api50/lib/options').Resources
 const Localresources = {
   getOffers: [
@@ -59,8 +67,8 @@ mongoose.connect(process.env.MONGODB_CONNECTION_STRING, { useUnifiedTopology: tr
   );
 
 
-const mainLoop = async function (){
-  while(true){
+const mainLoop = async function () {
+  while (true) {
     console.log(" => Starting new update loop <=")
     await fetchProducts()
     await sleep(50000)
@@ -164,7 +172,7 @@ async function sendNotifications(firebaseTokenList, p) {
     tokens: registrationTokens,
   }
   //console.log("Sending Message to: ", firebaseTokenList)
-  
+
   admin.messaging().sendMulticast(message)
     .then((response) => {
       console.log("FIREBASE: ", response.successCount + ' messages were sent successfully...');
