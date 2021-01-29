@@ -5,7 +5,6 @@ require('dotenv').config();
 require('log-timestamp');
 var mongoose = require('mongoose');
 var admin = require("firebase-admin");
-var serviceAccount = require("./track4deals-firebase-adminsdk-h07o4-64eee604e3.json");
 const delay = require('delay');
 
 admin.initializeApp({
