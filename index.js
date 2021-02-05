@@ -94,42 +94,47 @@ const fetchProducts = async function () {
  * @param {product} p 
  * Check if product is on offer and update mongoDB
  */
-async function updateDB(p) {//TODO: mi sa che bisogna chiederli a gruppi di N prodotti 
-  let res = await getProductFromAmazon(p).catch(e => { console.log(e); });
-  let items = res.data.ItemsResult.Items;
-  for (i in items) {
-    let productInfo = items[i];
-    if (productInfo.Offers != undefined) { // Prodotto non ha il prezzo o ci sono casini
-      if (productInfo.Offers.Listings[0].Price.Savings != undefined) { // Se il prodotto è in offerta
-        if (p[i].offer_price.toFixed(2) != productInfo.Offers.Listings[0].Price.Amount.toFixed(2)) { // Se l'offerta è cambiata
-          p[i].normal_price = productInfo.Offers.Listings[0].Price.Amount.toFixed(2) + productInfo.Offers.Listings[0].Price.Savings.Amount.toFixed(2);
-          p[i].offer_price = productInfo.Offers.Listings[0].Price.Amount.toFixed(2);
-          p[i].discount_perc = productInfo.Offers.Listings[0].Price.Savings.Percentage;
-          p[i].isDeal = true;
-          db.update_product(p[i]).then((firebaseTokenList) => {
-            console.log(`Product ${p[i].ASIN} on offer, updated price from ${p[i].normal_price} to ${p[i].offer_price}...`)
-            // Invio notifiche dei prodotti modificati
-            if (firebaseTokenList.length > 0) {
-              sendNotifications(firebaseTokenList, p[i])
-            }
-          });
-        } else {
-          console.log(`Product ${p[i].ASIN} still on offer...`)
+async function updateDB(p) {
+  try {
+    let res = await getProductFromAmazon(p);
+    let items = res.data.ItemsResult.Items;
+    for (i in items) {
+      let productInfo = items[i];
+      if (productInfo.Offers != undefined) { // Prodotto non ha il prezzo o ci sono casini
+        if (productInfo.Offers.Listings[0].Price.Savings != undefined) { // Se il prodotto è in offerta
+          if (p[i].offer_price.toFixed(2) != productInfo.Offers.Listings[0].Price.Amount.toFixed(2)) { // Se l'offerta è cambiata
+            p[i].normal_price = productInfo.Offers.Listings[0].Price.Amount.toFixed(2) + productInfo.Offers.Listings[0].Price.Savings.Amount.toFixed(2);
+            p[i].offer_price = productInfo.Offers.Listings[0].Price.Amount.toFixed(2);
+            p[i].discount_perc = productInfo.Offers.Listings[0].Price.Savings.Percentage;
+            p[i].isDeal = true;
+            db.update_product(p[i]).then((firebaseTokenList) => {
+              console.log(`Product ${p[i].ASIN} on offer, updated price from ${p[i].normal_price} to ${p[i].offer_price}...`)
+              // Invio notifiche dei prodotti modificati
+              if (firebaseTokenList.length > 0) {
+                sendNotifications(firebaseTokenList, p[i])
+              }
+            });
+          } else {
+            console.log(`Product ${p[i].ASIN} still on offer...`)
+          }
         }
-      }
-      else { // Se il prodotto non è in offerta
-        if (p[i].isDeal) {
-          p[i].normal_price = productInfo.Offers.Listings[0].Price.Amount;
-          p[i].isDeal = false;
-          db.update_product(p[i]).then((res) => {
-            console.log(`Product ${p[i].ASIN} not on offer, DB UPDATED...`)
-          });
-        }
-        else {
-          console.log(`Product ${p[i].ASIN} remains not on offer...`)
+        else { // Se il prodotto non è in offerta
+          if (p[i].isDeal) {
+            p[i].normal_price = productInfo.Offers.Listings[0].Price.Amount;
+            p[i].isDeal = false;
+            db.update_product(p[i]).then((res) => {
+              console.log(`Product ${p[i].ASIN} not on offer, DB UPDATED...`)
+            });
+          }
+          else {
+            console.log(`Product ${p[i].ASIN} remains not on offer...`)
+          }
         }
       }
     }
+  }
+  catch(e){
+    console.log(`ERROR updating DB: ${e}`);
   }
 }
 
