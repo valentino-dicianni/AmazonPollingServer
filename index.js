@@ -107,13 +107,7 @@ async function updateDB(p) {
             p[i].offer_price = productInfo.Offers.Listings[0].Price.Amount.toFixed(2);
             p[i].discount_perc = productInfo.Offers.Listings[0].Price.Savings.Percentage;
             p[i].isDeal = true;
-            db.update_product(p[i]).then((firebaseTokenList) => {
-              console.log(`Product ${p[i].ASIN} on offer, updated price from ${p[i].normal_price} to ${p[i].offer_price}...`)
-              // Invio notifiche dei prodotti modificati
-              if (firebaseTokenList.length > 0) {
-                sendNotifications(firebaseTokenList, p[i])
-              }
-            });
+            updateAndNotify(p[i]);
           } else {
             console.log(`Product ${p[i].ASIN} still on offer...`)
           }
@@ -161,6 +155,15 @@ const getProductFromAmazon = async function (products) {
   });
 }
 
+async function updateAndNotify(product) {
+  db.update_product(product).then((firebaseTokenList) => {
+    console.log(`Product ${product.ASIN} on offer, updated price from ${product.normal_price} to ${product.offer_price}...`)
+    // Invio notifiche dei prodotti modificati
+    if (firebaseTokenList.length > 0) {
+      sendNotifications(firebaseTokenList, product)
+    }
+  });
+}
 
 /**
  * Send messages via Firebase to registerd users
